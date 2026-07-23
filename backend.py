@@ -23,6 +23,7 @@ _spec = importlib.util.spec_from_file_location(
 _client = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_client)
 crawl = _client.crawl
+set_value = _client.set_value
 
 # Cibles récemment interrogées, persistées dans le store scellé à l'outil (confort UI).
 _TARGETS_SCOPE = "target"
@@ -35,6 +36,8 @@ def api(path, method, payload, ctx):
 
     if parts == ["crawl"] and method == "POST":
         return _crawl(payload, ctx)
+    if parts == ["set"] and method == "POST":
+        return _set(payload, ctx)
     if parts == ["targets"] and method == "GET":
         return {"targets": _list_targets(ctx)}
     if parts == ["targets"] and method == "DELETE":
@@ -72,6 +75,42 @@ def _crawl(payload, ctx):
     params = sum(1 for e in tree.values() if e["kind"] == "param")
     return {"ok": True, "host": host, "port": port, "elapsed_ms": elapsed,
             "count": len(tree), "nodes": nodes, "params": params, "tree": tree}
+
+
+def _set(payload, ctx):
+    """Écrit une valeur sur un paramètre RW. `type` (string|int|bool|real) fixe le type BER —
+    l'UI le déduit de la valeur relevée, pour ne pas écrire une chaîne à la place d'un entier."""
+    host = (str(payload.get("host") or "")).strip()
+    if not host:
+        return 400, {"error": "hôte requis"}
+    try:
+        port = int(payload.get("port") or 9000)
+    except (TypeError, ValueError):
+        return 400, {"error": "port invalide"}
+    raw_path = payload.get("path")
+    try:
+        path = [int(x) for x in str(raw_path).split(".") if x != ""]
+    except (TypeError, ValueError):
+        path = []
+    if not path:
+        return 400, {"error": "chemin invalide"}
+    value = payload.get("value")
+    vtype = (payload.get("type") or "string").lower()
+    try:
+        if vtype in ("int", "integer"):
+            value = int(value)
+        elif vtype == "bool":
+            value = value in (True, "true", "1", 1)
+        elif vtype == "real":
+            value = float(value)
+        else:
+            value = "" if value is None else str(value)
+    except (TypeError, ValueError):
+        return 400, {"error": "valeur incompatible avec le type %s" % vtype}
+
+    ctx.audit("set", "%s:%d %s = %r" % (host, port, ".".join(map(str, path)), value))
+    ok, msg = set_value(host, port, path, value)
+    return {"ok": ok, "message": msg, "path": ".".join(map(str, path)), "value": value}
 
 
 def _list_targets(ctx):

@@ -95,12 +95,16 @@ window.BTTools.ember_reader = (function () {
             const depth = p.split(".").length - 1;
             const hasKids = e.kind === "node" && paths.some((x) => x.startsWith(p + ".") && x.split(".").length === depth + 2);
             const caret = hasKids ? (collapsed.has(p) ? "▸" : "▾") : "·";
-            const ro = (e.kind === "param" && e.access != null && e.access === 1) ? ' <span class="er-ro">RO</span>' : "";
+            const rw = e.kind === "param" && e.access === 3;   // 3 = read-write
+            const badge = e.kind === "param"
+                ? (rw ? ' <span class="er-rw" data-edit="' + esc(p) + '" title="Modifier">RW ✎</span>'
+                      : (e.access === 1 ? ' <span class="er-ro">RO</span>' : ""))
+                : "";
             let val = "";
             if (e.kind === "param") {
                 let v = e.value;
                 if (e.enum && Number.isInteger(v) && e.enum[v] != null) v = e.enum[v] + " (" + v + ")";
-                val = '<span class="er-val">' + esc(String(v).slice(0, 300)) + '</span>' + ro;
+                val = '<span class="er-val">' + esc(String(v).slice(0, 300)) + '</span>' + badge;
             }
             rows.push(
                 '<div class="er-row er-' + e.kind + '" data-p="' + esc(p) + '" style="padding-left:' + (depth * 16 + 4) + 'px">' +
@@ -114,6 +118,36 @@ window.BTTools.ember_reader = (function () {
             if (collapsed.has(p)) collapsed.delete(p); else collapsed.add(p);
             render();
         });
+        $("#er-body").querySelectorAll(".er-rw[data-edit]").forEach((b) => b.onclick = () => editParam(b.dataset.edit));
+    }
+
+    // Type BER déduit de la valeur relevée : un provider attend le bon type sur un SetValue.
+    function typeOf(v) {
+        if (typeof v === "boolean") return "bool";
+        if (typeof v === "number") return Number.isInteger(v) ? "int" : "real";
+        return "string";
+    }
+
+    async function editParam(path) {
+        const e = TREE[path];
+        if (!e) return;
+        const t = typeOf(e.value);
+        const cur = e.value == null ? "" : String(e.value);
+        const input = window.prompt("Écrire " + (e.id || path) + " (" + path + ") — type " + t + " :", cur);
+        if (input === null) return;   // annulé
+        if (!window.confirm("Écrire réellement sur l'équipement ?\n" + path + " = " + input)) return;
+        const host = $("#er-host").value.trim();
+        const port = parseInt($("#er-port").value) || 9000;
+        try {
+            const d = await CTX.api("set", { method: "POST", body: { host, port, path, value: input, type: t } });
+            if (d.ok) {
+                CTX.toast(d.message || "écrit");
+                if (TREE[path]) TREE[path].value = (t === "int") ? parseInt(input) : (t === "real") ? parseFloat(input) : (t === "bool") ? (input === "true" || input === "1") : input;
+                render();
+            } else {
+                CTX.toast(d.message || d.error || "échec", "error");
+            }
+        } catch (err) { CTX.toast(err.message || err, "error"); }
     }
 
     return { mount, unmount };

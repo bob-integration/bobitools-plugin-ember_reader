@@ -15,7 +15,9 @@ Un provider Ember+ expose un arbre plat de nœuds/paramètres à chemins RELATIV
 client fait un GetDirectory racine, puis un GetDirectory ciblé sur chaque nœud rencontré
 (l'arbre n'est pas renvoyé en entier d'un coup : chaque niveau se demande explicitement).
 """
+import math
 import socket
+import struct
 import time
 
 # ─── Constantes S101 / Glow (cf. libs101 / libember) ───────────────────
@@ -36,6 +38,7 @@ G_QUAL_PARAMETER = 9
 G_QUAL_NODE = 10
 G_ROOT_ELEMENT_COLLECTION = 11
 CMD_GET_DIRECTORY = 32
+PC_VALUE = 2                    # ParameterContents : champ Value (pour un SetValue)
 
 U_BOOL, U_INTEGER, U_UTF8, U_REAL = 1, 2, 12, 9
 
@@ -101,6 +104,56 @@ def _relative_oid_bytes(path):
 
 def ber_relative_oid(path):
     return _universal_primitive(13, _relative_oid_bytes(path))
+
+def ber_utf8(s):
+    return _universal_primitive(U_UTF8, (s or "").encode("utf-8"))
+
+def ber_bool(v):
+    return _universal_primitive(U_BOOL, b"\xff" if v else b"\x00")
+
+def _real_bytes(value):
+    if value == 0.0:
+        return b""
+    if math.isinf(value):
+        return b"\x40" if value > 0 else b"\x41"
+    if math.isnan(value):
+        return b"\x42"
+    bits = struct.unpack(">Q", struct.pack(">d", value))[0]
+    sign = (bits >> 63) & 1
+    raw_exp = (bits >> 52) & 0x7FF
+    raw_mant = bits & ((1 << 52) - 1)
+    if raw_exp == 0:
+        exponent, mantissa = -1074, raw_mant
+    else:
+        exponent, mantissa = raw_exp - 1023 - 52, raw_mant | (1 << 52)
+    while mantissa and (mantissa & 1) == 0:
+        mantissa >>= 1
+        exponent += 1
+    if mantissa == 0:
+        return b""
+    mantissa_bytes = mantissa.to_bytes(max(1, (mantissa.bit_length() + 7) // 8), "big")
+    if exponent >= 0:
+        nb_exp = max(1, (exponent.bit_length() + 8) // 8)
+    else:
+        nb_exp = max(1, ((-exponent - 1).bit_length() + 8) // 8)
+    exp_bytes = exponent.to_bytes(nb_exp, "big", signed=True)
+    cb = 0x80 | (0x40 if sign else 0) | min(nb_exp - 1, 3)
+    if nb_exp <= 3:
+        return bytes([cb]) + exp_bytes + mantissa_bytes
+    return bytes([cb, nb_exp]) + exp_bytes + mantissa_bytes
+
+def ber_real(value):
+    return _universal_primitive(U_REAL, _real_bytes(value))
+
+def _encode_value(value):
+    """Valeur Python → primitive BER universelle, selon son type. bool AVANT int (bool ⊂ int)."""
+    if isinstance(value, bool):
+        return ber_bool(value)
+    if isinstance(value, int):
+        return ber_int(value)
+    if isinstance(value, float):
+        return ber_real(value)
+    return ber_utf8(str(value))
 
 # ─── Décodeur BER ──────────────────────────────────────────────────────
 def _decode_len(buf, i):
@@ -372,6 +425,73 @@ def _decode(payload, out):
             elif cons:                            # wrapper [ctx 0] / collection [app 4|11]
                 walk(content)
     walk(payload)
+
+def _setvalue_frame(path, value):
+    """Trame SetValue consumer→provider : QualifiedParameter[path] dont les contents ne
+    portent que la nouvelle Value ([Ctx PC_VALUE]). Le provider retrouve le paramètre par
+    son chemin absolu et applique la valeur."""
+    contents = _universal_constructed(17, _ctx_explicit(PC_VALUE, _encode_value(value)))
+    qp = _app_constructed(G_QUAL_PARAMETER,
+                          _ctx_explicit(0, ber_relative_oid(path)) +
+                          _ctx_explicit(1, contents))
+    coll = _app_constructed(G_ROOT_ELEMENT_COLLECTION, _ctx_explicit(0, qp))
+    return s101_encode_ember(_app_constructed(0, coll))
+
+def _universal_constructed(tag_num, content):
+    return _tlv(0x20 | (tag_num & 0x1F), content)
+
+def set_value(host, port, path, value, timeout=4.0, verify=True):
+    """Écrit `value` sur le paramètre `path` (liste d'entiers) d'un provider Ember+.
+
+    Renvoie (ok, message). Si `verify`, relit le paramètre après écriture et compare — un
+    provider Ember+ n'ACQUITTE pas un SetValue, la seule confirmation fiable est la relecture.
+    ATTENTION : écrit réellement sur l'équipement (ex. router un flux sur un Ross Newt)."""
+    if not path:
+        return False, "chemin vide"
+    try:
+        sock = socket.create_connection((host, int(port)), timeout=timeout)
+    except Exception as e:
+        return False, "connexion impossible : %s" % e
+    sock.settimeout(timeout)
+    try:
+        sock.sendall(_setvalue_frame(list(path), value))
+        # Laisser le provider appliquer + éventuellement pousser la nouvelle valeur.
+        time.sleep(0.4)
+        try:
+            while True:
+                if not sock.recv(65536):
+                    break
+        except socket.timeout:
+            pass
+        if not verify:
+            return True, "écrit (non vérifié)"
+        # Relecture ciblée du paramètre : GetDirectory sur son parent, on cherche `path`.
+        parent = list(path[:-1])
+        sock.sendall(_getdir_frame(parent))
+        buf = b""
+        got = False
+        sock.settimeout(0.3)
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                d = sock.recv(65536)
+                if not d:
+                    break
+                buf += d
+                got = True
+            except socket.timeout:
+                if got:
+                    break
+        out = {}
+        for k, p in S101Reader().feed(buf):
+            if k == "payload":
+                _decode(p, out)
+        cur = out.get(tuple(path), {}).get("value")
+        if cur == value:
+            return True, "écrit et vérifié"
+        return True, "écrit, mais relecture = %r (attendu %r)" % (cur, value)
+    finally:
+        sock.close()
 
 def crawl(host, port, timeout=4.0, max_depth=6, max_nodes=2000):
     """Relève l'arbre complet d'un provider Ember+. Renvoie (tree, error).

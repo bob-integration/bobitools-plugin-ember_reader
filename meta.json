@@ -2,6 +2,7 @@
   "date": "2026-07-23",
   "changes": {
     "Nouveautés": [
+      "v0.2.0 — Écriture (SetValue). Le client Ember+ sait désormais ÉCRIRE un paramètre inscriptible, pas seulement lire. Dans l'arbre, un paramètre RW porte un bouton « RW ✎» : clic → saisie → écriture, avec confirmation (on écrit réellement sur l'équipement). Le type BER est déduit de la valeur relevée (string/int/bool/real) pour ne pas écrire une chaîne à la place d'un entier. Un provider Ember+ n'acquitte pas un SetValue : la confirmation vient d'une RELECTURE du paramètre après écriture. Validé sur un Ross Newt réel (réécriture du SDP d'un receiver à l'identique — aucun flux routé). C'est la brique qui débloque le pilotage du Newt : router un flux = écrire le SDP d'un receiver.",
       "v0.1.0 — Inspecteur d'arbre Ember+ générique. Se connecte à un provider (host:port), relève tout l'arbre en lecture seule (GetDirectory récursif) et l'affiche : nœuds/paramètres repliables, valeurs, énumérations résolues, accès (RO), filtre plein-texte, cibles récentes. Client Ember+ S101/BER autonome (aucune dépendance au service emberplus), pensé comme brique de base pour piloter des équipements Ember+ natifs (ex. Ross Newt sur :9095)."
     ]
   }
