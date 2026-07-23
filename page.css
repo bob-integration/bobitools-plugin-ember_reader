@@ -1,0 +1,25 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later — Ember+ Reader */
+.er-app { display: flex; flex-direction: column; height: 100%; gap: 10px; }
+.er-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.er-host { width: 190px; }
+.er-port { width: 90px; }
+.er-colon { opacity: .6; }
+.er-spacer { flex: 1; }
+.er-filter { width: 220px; }
+.er-meta { font-size: .85em; opacity: .7; white-space: nowrap; }
+.er-recent { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 0; }
+.er-recent-lbl { font-size: .8em; opacity: .6; }
+.er-chip { font-size: .8em; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border, #4444); background: transparent; cursor: pointer; }
+.er-chip:hover { background: var(--hover, #8882); }
+.er-body { flex: 1; overflow: auto; border: 1px solid var(--border, #4443); border-radius: 8px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .84em; }
+.er-empty, .er-err { padding: 18px; opacity: .75; line-height: 1.5; }
+.er-err { color: #d33; }
+.er-row { display: flex; align-items: baseline; gap: 8px; padding-top: 2px; padding-bottom: 2px; white-space: nowrap; border-bottom: 1px solid var(--border, #8881); }
+.er-row:hover { background: var(--hover, #8881); }
+.er-caret { width: 1em; cursor: pointer; opacity: .6; user-select: none; text-align: center; flex: none; }
+.er-node .er-id { font-weight: 600; }
+.er-path { opacity: .45; min-width: 90px; flex: none; }
+.er-id { color: var(--accent, #4a9); }
+.er-val { color: var(--text, inherit); opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+.er-param .er-val::before { content: "= "; opacity: .5; }
+.er-ro { font-size: .8em; padding: 0 4px; border-radius: 4px; background: #8883; opacity: .7; }

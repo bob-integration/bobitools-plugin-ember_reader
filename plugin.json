@@ -1,0 +1,15 @@
+{
+  "license": "GPL-3.0-or-later",
+  "type": "ember_reader",
+  "label": "Ember+ Reader",
+  "version": "0.1.0",
+  "runtime": "inprocess",
+  "description": "Inspecteur d'arbre Ember+ générique : se connecte à n'importe quel provider Ember+ (host:port), relève tout son arbre en lecture seule (nœuds, paramètres, valeurs, énumérations) et l'affiche. Outil de debug — et brique cliente de base pour piloter des équipements Ember+ natifs (ex. Ross Newt sur :9095).",
+  "badge": { "label": "Ember+", "class": "tool-emberreader", "oklch": "0.70 0.13 160" },
+  "nav": { "section": "reseau", "label": "Réseau", "order": 34 },
+  "ui": {
+    "page_html": "page.html",
+    "page_js": "page.js",
+    "page_css": "page.css"
+  }
+}

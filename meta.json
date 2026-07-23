@@ -1,0 +1,8 @@
+{
+  "date": "2026-07-23",
+  "changes": {
+    "Nouveautés": [
+      "v0.1.0 — Inspecteur d'arbre Ember+ générique. Se connecte à un provider (host:port), relève tout l'arbre en lecture seule (GetDirectory récursif) et l'affiche : nœuds/paramètres repliables, valeurs, énumérations résolues, accès (RO), filtre plein-texte, cibles récentes. Client Ember+ S101/BER autonome (aucune dépendance au service emberplus), pensé comme brique de base pour piloter des équipements Ember+ natifs (ex. Ross Newt sur :9095)."
+    ]
+  }
+}
