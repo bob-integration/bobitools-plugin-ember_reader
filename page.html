@@ -4,14 +4,22 @@
     <input type="text" id="er-host" class="er-host" placeholder="10.10.4.61" autocomplete="off" spellcheck="false">
     <span class="er-colon">:</span>
     <input type="number" id="er-port" class="er-port" placeholder="9095" min="1" max="65535" value="9000">
+    <label class="er-lbl">délai
+      <input type="number" id="er-timeout" class="er-port" min="1" max="120" value="20"
+             title="Un provider volumineux met plusieurs secondes à pousser son arbre">
+    </label>
     <button class="btn btn-green" id="er-go" type="button">Lire l'arbre</button>
+    <button class="btn" id="er-all" type="button"
+            title="Parcourt TOUT l'arbre d'un coup — lent sur un provider volumineux, mais seul mode où le filtre voit l'ensemble">Tout relever</button>
     <span class="er-spacer"></span>
     <input type="search" id="er-filter" class="er-filter" placeholder="Filtrer…" autocomplete="off" hidden>
     <span class="er-meta" id="er-meta"></span>
   </div>
   <div class="er-recent" id="er-recent"></div>
+  <div class="er-warn" id="er-warn" hidden></div>
   <div class="er-body" id="er-body">
     <div class="er-empty">Saisissez l'adresse d'un provider Ember+ (host : port) et cliquez « Lire l'arbre ».<br>
+      L'arbre s'ouvre <strong>replié</strong> : chaque branche n'est lue qu'au moment où vous la dépliez.<br>
       Exemple : un Ross Newt répond sur le port <strong>9095</strong>.</div>
   </div>
 </div>

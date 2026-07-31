@@ -25,3 +25,11 @@
 .er-ro { font-size: .8em; padding: 0 4px; border-radius: 4px; background: #8883; opacity: .7; }
 .er-rw { font-size: .8em; padding: 0 5px; border-radius: 4px; background: #2a7; color: #fff; cursor: pointer; opacity: .9; }
 .er-rw:hover { opacity: 1; }
+
+/* Avertissements d'un relevé ÉCOURTÉ. En avertissement et pas en erreur : l'arbre affiché est
+   vrai, il est seulement incomplet — et c'est justement ce qui trompe si on ne le dit pas. */
+.er-warn {
+    margin: 8px 0; padding: 8px 12px; border-radius: var(--radius); font-size: .92em;
+    background: var(--status-warning-bg); color: var(--status-warning-fg);
+}
+.er-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: .9em; opacity: .85; }

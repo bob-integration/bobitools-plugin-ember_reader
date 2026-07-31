@@ -2,9 +2,9 @@
   "license": "GPL-3.0-or-later",
   "type": "ember_reader",
   "label": "Ember+ Reader",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "runtime": "inprocess",
-  "description": "Inspecteur d'arbre Ember+ générique : se connecte à n'importe quel provider Ember+ (host:port), relève tout son arbre en lecture seule (nœuds, paramètres, valeurs, énumérations) et l'affiche. Outil de debug — et brique cliente de base pour piloter des équipements Ember+ natifs (ex. Ross Newt sur :9095).",
+  "description": "Lecteur Ember+ : se connecte à un provider (VSM, Ross Newt, notre propre service…) et parcourt son arbre À LA DEMANDE — la racine d'abord, chaque branche lue au dépliage. Relevé complet possible d'un bouton. Écriture d'un paramètre après double confirmation.",
   "badge": {
     "label": "Ember+",
     "class": "tool-emberreader",

@@ -493,22 +493,90 @@ def set_value(host, port, path, value, timeout=4.0, verify=True):
     finally:
         sock.close()
 
-def crawl(host, port, timeout=4.0, max_depth=6, max_nodes=2000):
-    """Relève l'arbre complet d'un provider Ember+. Renvoie (tree, error).
-    tree : { "1.2.3": {kind,id,value,enum,access}, ... }. Lecture seule."""
-    tree = {}
+def browse(host, port, path=(), timeout=8.0):
+    """Relève les enfants DIRECTS d'un seul nœud. Renvoie (enfants, error, tronque).
+
+    C'est le mode de lecture par DÉFAUT de l'outil, et `crawl` devient l'exception. La raison
+    est mesurée : un provider à grille pleine pousse plusieurs mégaoctets et met une dizaine de
+    secondes à se laisser parcourir en entier, pour un écran où l'on ne regarde jamais qu'une
+    branche. Lire à la demande rend la première image immédiate, et ne coûte que ce qu'on ouvre.
+
+    `tronque` dit que la réponse de ce nœud n'était pas terminée quand le délai a expiré — même
+    règle que `crawl` : un relevé écourté ne doit jamais passer pour un nœud vide."""
     try:
         sock = socket.create_connection((host, int(port)), timeout=timeout)
     except Exception as e:
-        return {}, "connexion impossible : %s" % e
+        return {}, "connexion impossible : %s" % e, False
+    sock.settimeout(timeout)
+    tronque = False
+    try:
+        path = [int(x) for x in (path or [])]
+        sock.sendall(_getdir_frame(path))
+        # Même lecture par détection de SILENCE que `crawl` : on accumule tant que ça arrive,
+        # et on sort au premier blanc APRÈS avoir reçu quelque chose.
+        buf = b""
+        got = False
+        sock.settimeout(0.3)
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                d = sock.recv(65536)
+                if not d:
+                    break
+                buf += d
+                got = True
+            except socket.timeout:
+                if got:
+                    break
+        else:
+            tronque = True
+        vus = {}
+        for k, pl in S101Reader().feed(buf):
+            if k == "payload":
+                _decode(pl, vus)
+    finally:
+        sock.close()
+    # Enfants DIRECTS seulement. Un provider répond souvent plus large que demandé (il pousse
+    # au passage des branches voisines) ; tout garder ferait un arbre incohérent avec ce que
+    # l'utilisateur a ouvert.
+    n = len(path)
+    enfants = {".".join(map(str, k)): v for k, v in vus.items()
+               if len(k) == n + 1 and list(k[:n]) == path}
+    return enfants, None, tronque
+
+
+def crawl(host, port, timeout=4.0, max_depth=6, max_nodes=2000):
+    """Relève l'arbre d'un provider Ember+. Renvoie (tree, error, limites).
+
+    `limites` dit ce qui a été ÉCOURTÉ : `{"max_nodes": …}` si le plafond de nœuds a stoppé
+    l'exploration, `{"timeout": …}` si un nœud n'a pas répondu dans le délai, `{"max_depth": …}`
+    si des branches ont été laissées de côté.
+
+    Pourquoi ce troisième retour. Un arbre écourté ressemblait exactement à un arbre vide :
+    la fonction rendait `(tree, None)` et l'appelant annonçait un succès. Constaté le
+    2026-07-31 sur notre propre provider — 2,6 Mo à pousser, le relevé abandonnait pendant le
+    transfert et rendait « ok, 0 élément », ce qui envoie chercher le défaut chez le provider
+    alors qu'il est chez le client. Un abandon doit se dire."""
+    tree = {}
+    limites = {}
+    try:
+        sock = socket.create_connection((host, int(port)), timeout=timeout)
+    except Exception as e:
+        return {}, "connexion impossible : %s" % e, {}
     sock.settimeout(timeout)
     try:
         seen = set()
         queue = [[]]
-        while queue and len(tree) < max_nodes:
+        while queue:
+            if len(tree) >= max_nodes:
+                limites["max_nodes"] = max_nodes
+                break
             path = queue.pop(0)
             key = tuple(path)
-            if key in seen or len(path) > max_depth:
+            if len(path) > max_depth:
+                limites["max_depth"] = max_depth
+                continue
+            if key in seen:
                 continue
             seen.add(key)
             sock.sendall(_getdir_frame(path))
@@ -529,6 +597,11 @@ def crawl(host, port, timeout=4.0, max_depth=6, max_nodes=2000):
                 except socket.timeout:
                     if got:
                         break        # données reçues puis silence → réponse du nœud terminée
+            else:
+                # Sorti par la DEADLINE, pas par le silence : la réponse de ce nœud est
+                # incomplète, donc l'arbre l'est aussi. C'est le cas d'un provider volumineux
+                # sur un délai trop court, et il ne doit surtout pas passer pour un succès.
+                limites["timeout"] = timeout
             got = {}
             for k, p in S101Reader().feed(buf):
                 if k == "payload":
@@ -540,4 +613,4 @@ def crawl(host, port, timeout=4.0, max_depth=6, max_nodes=2000):
                     queue.append(list(p))
     finally:
         sock.close()
-    return {".".join(map(str, k)): v for k, v in tree.items()}, None
+    return {".".join(map(str, k)): v for k, v in tree.items()}, None, limites
