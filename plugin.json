@@ -19,5 +19,44 @@
     "page_html": "page.html",
     "page_js": "page.js",
     "page_css": "page.css"
+  },
+  "permissions": [
+    {
+      "id": "param.set",
+      "label": "Écrire un paramètre Ember+",
+      "default_roles": [
+        "operator"
+      ],
+      "description": "Modifie une valeur sur le provider distant (VSM, Ross…)."
+    }
+  ],
+  "acl": {
+    "routes": [
+      {
+        "method": "POST",
+        "path": "browse",
+        "perm": null
+      },
+      {
+        "method": "POST",
+        "path": "crawl",
+        "perm": null
+      },
+      {
+        "method": "DELETE",
+        "path": "targets",
+        "perm": null
+      },
+      {
+        "method": "POST",
+        "path": "set",
+        "perm": "param.set"
+      },
+      {
+        "method": "*",
+        "path": "**",
+        "perm": "param.set"
+      }
+    ]
   }
 }
